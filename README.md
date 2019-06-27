@@ -27,28 +27,28 @@ There are no mines adjacent to the clicked cell, so when it is revealed, it beco
 At this point, there are still un-revealed cells that do not contain mines (denoted by '.' characters), so the player has to click again in order to continue the game.
 You want to win the game as quickly as possible. There is nothing quicker than winning in one click. Given the size of the board (R x C) and the number of hidden mines M, is it possible (however unlikely) to win in one click? You may choose where you click. If it is possible, then print any valid mine configuration and the coordinates of your click, following the specifications in the Output section. Otherwise, print "Impossible".
 
-###Input
+### Input
 The first line of the input gives the number of test cases, **T**. **T** lines follow. Each line contains three space-separated integers: **R**, **C**, and **M**.
 
-###Output
+### Output
 For each test case, output a line containing "Case #x:", where x is the test case number (starting from 1). On the following **R** lines, output the board configuration with **C** characters per line, using '.' to represent an empty cell, '*' to represent a cell that contains a mine, and 'c' to represent the clicked cell.
 
 If there is no possible configuration, then instead of the grid, output a line with "Impossible" instead. If there are multiple possible configurations, output any one of them.
 
-####Limits
+#### Limits
 0 ≤ M < R * C.
-#####Small dataset
+##### Small dataset
 1 ≤ T ≤ 230.
 
 1 ≤ R, C ≤ 5.
-#####Large dataset
+##### Large dataset
 1 ≤ T ≤ 140.
 
 1 ≤ R, C ≤ 50.
 
-###Sample
+### Sample
 
-####Input
+#### Input
 ```
 5
 5 5 23
@@ -58,7 +58,7 @@ If there is no possible configuration, then instead of the grid, output a line w
 10 10 82
 ```
  	
-####Output 
+#### Output 
 ```
 Case #1:
 Impossible
