@@ -1,4 +1,4 @@
-import Data.List ((\\))
+import Data.List ((\\), sort)
 import Control.Monad
 data Cell = I | O deriving (Eq, Show)
 
@@ -71,58 +71,107 @@ fromDecimal n = mod n 2 : fromDecimal (div n 2)
 --			O
 
 
+tapada = 0
+bomba = 1
+destapada = 2
+click = 3
+
+data Tablero = T Int Int [Int] deriving (Show)
+
+
+libresPos :: Tablero -> [Int]
+libresPos (T f c ts) = foldr (\c r n -> if c == tapada then n:(r (n+1)) else r (n+1)) (\n -> []) ts 0
+
+generar :: Int -> Int -> Int -> [Tablero]
+generar r c m = map (\t -> T r c t) (filter (\xs -> length (filter (==1) xs) == m ) $ replicateM (r*c) [bomba,tapada])
+
+--[0,0,0,0,0]
+
+
+winner :: [Tablero] -> Maybe Tablero
+winner = foldr (\t acc -> case acc of
+                                Nothing -> isWinner t
+                                Just t -> Just t) Nothing
+
+isWinner :: Tablero -> Maybe Tablero
+isWinner t = foldr (\p acc -> case acc of
+                                   Nothing -> isWinnerIn p t
+                                   Just t -> Just t) Nothing (libresPos t)
+isWinnerIn 0 T
+isWinnerIn 4 T
+isWinnerIn 6 T
+
+                                   
+isWinnerIn :: Int -> Tablero -> Maybe Tablero
+isWinnerIn p (T f c ts) = foldr (\t acc -> case acc of
+                                                Nothing -> Just (destapar p t) -- checkear si no hay libres
+                                                Just t -> Just t) Nothing  ts
+--p: son todas las posiciones libres                                                
+                                                
+
+destapar :: Int -> Tablero -> Tablero
+destapar p t = t
+
+sing :: Bool -> [Int] -> [Int]
+sing b l = if b then l else []
+
+vecinas_old :: Int -> Tablero -> [Int]
+vecinas_old p (T f c ts) = map (+p) (
+                       sing (p>c-1) [-c]
+                    ++ sing ((p>c-1) && (mod p c) > 0) [-c-1]
+                    ++ sing ((p>c-1) && (mod p c) < c-1) [-c+1]
+                    ++ sing ((mod p c) > 0) [-1]
+                    ++ sing ((mod p c) < c-1) [1]
+                    ++ sing (p<c*f-c && (mod p c) > 0) [c-1]
+                    ++ sing (p<c*f-c) [c]
+                    ++ sing (p<c*f-c  && (mod p c) < c-1) [c+1])
+     
+vecinas :: Int -> Tablero -> [Int]
+vecinas p t = vecinaArribaIzquierda p t ++ vecinaArriba p t ++ vecinaArribaDerecha p t 
+                        ++ vecinaDerecha p t ++ vecinaAbajoDerecha p t ++ vecinaAbajo p t 
+                        ++ vecinaAbajoIzquierda p t ++ vecinaIzquierda p t 
+
+  -- donde el primer p  de un tablero es 0
+vecinaArribaIzquierda p (T f c ts) = if (p > c-1) && (mod p c)>0  then [p-(c+1)] else []
+
+vecinaArriba p (T f c ts) = if (p > c-1) then [p-c] else []
+
+vecinaArribaDerecha p (T f c ts) = if (p > c-1 && (mod (p+1) c)>0  ) then [p-c+1] else []
+
+vecinaDerecha p (T f c ts) = if (mod (p+1) c)>0 then [p+1] else []
+
+vecinaAbajoDerecha p (T f c ts) = if p<(f*c-1)-(c-1) && (mod (p+1) c)>0 then [p+1] else []
+
+vecinaAbajo p (T f c ts) = if p<(f*c-1)-(c-1)  then [p+c] else []
+
+vecinaAbajoIzquierda p (T f c ts) = if p<(f*c-1)-(c-1) && (mod p c) >0 then [p+(c-1)] else []
+
+vecinaIzquierda p (T f c ts) = if (mod p c)>0 then [p-1] else []
 
 
 
 
+areEqual a b = sort a == sort b
+
+tableroTest = T 3 3 [0,0,0,0,0,0,0,0,0]
+vecinasTest = 
+    map (\(p, r) -> if areEqual (vecinas p tableroTest) r then "OK" else "Er: "++show p)
+    [(0, [1,3,4]),
+    (1, [0,2,3,4,5]),
+    (2, [1,4,5]),
+    (3, [0,1,4,6,7]),
+    (4, [0,1,2,3,5,6,7,8]),
+    (5, [1,2,4,7,8]),
+    (6, [3,4,7]),
+    (7, [3,4,5,6,8]),
+    (8, [4,5,7])]
 
 
-
-
-
-generar :: Int -> Int -> Int -> [[Int]]
-generar r c m = filter (\xs -> length (filter (==1) xs) == m ) $ replicateM (r*c) [1,0]
-
-
-
-tieneUnaIsla :: [Int] -> Bool
-tieneUnaIsla xs =  
-
-
-int isSafe(int M[][COL], int row, int col, bool visited[][COL]) 
-{ 
-    return (row >= 0) && (row < ROW) && (col >= 0) && (col < COL) && (M[row][col] && !visited[row][col]); 
-} 
-  
-void DFS(int M[][COL], int row, int col, bool visited[][COL]) 
-{ 
-    static int rowNbr[] = { -1, -1, -1, 0, 0, 1, 1, 1 }; 
-    static int colNbr[] = { -1, 0, 1, -1, 1, -1, 0, 1 }; 
-  
-    visited[row][col] = true; 
-  
-    for (int k = 0; k < 8; ++k) 
-        if (isSafe(M, row + rowNbr[k], col + colNbr[k], visited)) 
-            DFS(M, row + rowNbr[k], col + colNbr[k], visited); 
-} 
-
-int countIslands(int M[][COL]) 
-{ 
-    bool visited[ROW][COL]; 
-    memset(visited, 0, sizeof(visited)); 
-      int count = 0; 
-    for (int i = 0; i < ROW; ++i) 
-        for (int j = 0; j < COL; ++j) 
-            if (M[i][j] && !visited[i][j]) { 
-                DFS(M, i, j, visited); 
-                ++count; 
-            } 
-    return count; 
-} 
-
-
-
-
-
+tableroTest2 = T 3 1 [0,0,0]
+vecinasTest2 = 
+    map (\(p, r) -> if areEqual (vecinas p tableroTest) r then "OK" else "Er: "++show p)
+    [(0, [1]),
+    (1, [0,2]),
+    (2, [1])]
 
 
