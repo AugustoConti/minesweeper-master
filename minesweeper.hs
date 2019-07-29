@@ -1,177 +1,95 @@
-import Data.List ((\\), sort)
-import Control.Monad
-data Cell = I | O deriving (Eq, Show)
+import System.Environment 
+import Data.List
+import Text.Printf
 
-celdas :: Int -> Int -> Int -> [Cell]
-celdas r c m = (replicate m I) ++ (replicate (r*c-m) O)
+type Fila = [Char]
+type Tablero = [Fila]
 
-permutations            :: [a] -> [[a]]
-permutations xs0        =  xs0 : perms xs0 []
-  where
-    perms []     _  = []
-    perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
-      where interleave    xs     r = let (_,zs) = interleave' id xs r in zs
-            interleave' _ []     r = (ts, r)
-            interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
-                                     in  (y:us, f (t:y:us) : zs)
+-- Fila de "l" de libres
+filaL :: Int -> Fila
+filaL l = replicate l '.'
 
-permutaciones_1 :: Eq a => [a] -> [[a]]
-permutaciones_1 [] = [[]]
-permutaciones_1 xs = [a:p | a <- xs, p <- permutaciones_1(xs \\ [a])]
+-- Tablero de "n" filas de "l" libres
+tabLibres :: Int -> Int -> Tablero
+tabLibres n l = replicate n $ filaL l
 
-deleteDuplicate :: (Eq a) => [a] -> [a]
-deleteDuplicate [] = []
-deleteDuplicate (x:xs) = x : deleteDuplicate (filter (/= x) xs)
+-- Fila de "m" de minas
+filaM :: Int -> Fila
+filaM m = replicate m '*'
 
-eliminaDuplicados1 :: Eq a => [a] -> [a]
-eliminaDuplicados1 [] = []
-eliminaDuplicados1 (x:xs) = x : eliminaDuplicados1 (elimina x xs)
+-- Tablero de "n" filas de "m" minas
+tabMinas :: Int -> Int -> Tablero
+tabMinas n m = replicate n $ filaM m
 
-elimina :: Eq a => a -> [a] -> [a]
-elimina x [] = []
-elimina x (y:ys) = if (x==y) then 
-                          elimina x ys
-                        else
-                          y : elimina x ys
+-- Fila de "m" minas seguida de "l" libres
+filaML :: Int -> Int -> Fila
+filaML m l = filaM m ++ filaL l
 
-tableros r c m= eliminaDuplicados1 $ permutations $ celdas r c m
+-- Tablero de "n" filas, cada una de "m" minas seguida de "l" libres
+tablero :: Int -> Int -> Int -> Tablero
+tablero n m l = replicate n $ filaML m l
 
-cellUp (r,c) =  (r-1,c)
-cellUR (r,c) =  (r-1,c+1)
-cellUL (r,c) =  (r-1,c-1)
-cellDw (r,c) =  (r+1,c)
-cellDL (r,c) =  (r+1,c-1)
-cellDR (r,c) =  (r+1,c+1)
-cellLt (r,c) =  (r,c-1)
-cellRt (r,c) =  (r,c+1)
+dosFilas :: Int -> Int -> Maybe Tablero
+dosFilas 1 0 = Just [".","."] -- tablero con 2 filas de 1 columna, sin minas
+dosFilas c m
+  | 2*c-m == 2 || odd m = Nothing -- con solo 2 libres imposible ganar o si es impar imposible ponerlos en 2 filas
+  | otherwise = Just $ tablero 2 ms (c-ms) where ms = div m 2 -- divido la cantidad de minas entre las 2 filas, el resto libres
 
+ultimasTresFilas :: Int -> (Int,Int) -> Tablero
+ultimasTresFilas c (l, 0) = tablero 3 (c-l) l -- entran justo, 3 filas, rellenas con minas y "l" libres
+ultimasTresFilas c (l, 1) = [filaML (c-l+1) (l-1)] ++ tablero 2 (c-l-1) (l+1) -- sobra 1, se pone en la última fila y se baja otra de la antepenúltima a la anteúltima fila
+ultimasTresFilas c (l, 2) = [filaML (c-l) l] ++ tablero 2 (c-l-1) (l+1) -- sobran 2, se ponen en las 2 ultimas filas
 
-clickEn :: (Int,Int) -> [[Cell]] -> Cell
-clickEn (r, c) t = t !! r !! c
+tresFilas :: Int -> Int -> Int -> Maybe Tablero
+tresFilas f c libres
+  | elem libres [2,3,5,7] = Nothing -- con solamente 2,3,5,7 libres, no hay forma de acomodarlas para ganar
+  | otherwise = Just $ tabMinas (f-3) c ++ (ultimasTresFilas c $ divMod libres 3) -- se rellena con minas, y se acomodan las últimas 3 filas
 
-resultado (r,c) t = if clickEn (r,c) t==I then
-                   Nothing
-                 else
-                    Just O
-                    
-fromDecimal :: Int -> [Int]
-fromDecimal 0 = [0]
-fromDecimal n = mod n 2 : fromDecimal (div n 2)
+resGral :: Int -> Int -> (Int, Int) -> Tablero
+resGral f c (l,0) = tabMinas (f-l) c ++ tabLibres l c -- entran justo, se rellena con minas y "l" filas libres
+resGral f c (l,1) = tabMinas (f-l-1) c ++ [filaML (c-2) 2, filaML 1 (c-1)] ++ tabLibres (l-1) c -- sobra 1, se sube 1 de la fila de abajo, y se ponen las 2 juntas
+resGral f c (l,s) = tabMinas (f-l-1) c ++ [filaML (c-s) s] ++ tabLibres l c -- sobran mas de 1, se rellena con minas y se ponen las "s" sobrantes en la fila
 
---t= [[I,I,O,O],[O,I,I,O],[I,O,I,O],[O,O,I,I],[O,I,O,I],[I,O,O,I]]
+resolver :: Int -> Int -> Int -> Maybe Tablero
+resolver f c m | f*c-m == 1 = Just $ tabMinas f c -- una sola libre, generamos el tablero con todas minas, total despues se sobreescribe la ultima celda con el click
+resolver 1 c m = Just $ tablero 1 m (c-m) -- generamos tablero de 1 fila con m minas y el resto de libres
+resolver f 1 m = fmap transpose $ resolver 1 f m -- con 1 columna, invertimos parametros para generar con 1 fila, y sacamos la transpuesta
+resolver 2 c m = dosFilas c m
+resolver f 2 m = fmap transpose $ resolver 2 f m
+resolver f c m
+  | m>=c*(f-3) = tresFilas f c libres -- si las minas llegan a tocar las últimas 3 filas, manejamos ese caso
+  | otherwise = Just $ resGral f c $ divMod libres c -- el tablero tiene mas de 3 filas, y las minas no llegan a tocar las últimas 3, resolvemos el caso general
+  where libres = f*c-m
 
---tableroGraph :: [[Cell]] -> String
---tableroGraph [] = ""
---tableroGraph (x:xs) = linea x ++ tableroGraph xs
+ponerClick :: Tablero -> Tablero
+ponerClick t = init t ++ [init (last t) ++ "c"]
 
---linea :: [Cell] -> String
---linea = foldl (\x acc -> if x==I 
---			then  (++) "B" acc 
---			else  (++) "."  acc )
---			O
+getResultado :: Maybe Tablero -> String
+getResultado Nothing = "Impossible"
+getResultado (Just tablero) = unlines $ ponerClick tablero
 
+resolverCaso :: [Int] -> String
+resolverCaso [f, c, m] = getResultado $ resolver f c m
 
-tapada = 0
-bomba = 1
-destapada = 2
-click = 3
+printCaso :: [String] -> Int -> [Char]
+printCaso cs n = printf "Case #%d:\n" (n+1) ++ (resolverCaso $ map read $ words $ cs!!n)
 
-data Tablero = T Int Int [Int] deriving (Show)
+resolverCasos :: [String] -> [String]
+resolverCasos (n:cs) = map (printCaso cs) [0..(read n)-1]
 
+larges :: [String]
+larges = ["L", "l", "large", "Large"]
 
-libresPos :: Tablero -> [Int]
-libresPos (T f c ts) = foldr (\c r n -> if c == tapada then n:(r (n+1)) else r (n+1)) (\n -> []) ts 0
+-- la idea es recibir por parametro l o L y que levante el archivo large, cualquier otra cosa levanta el small
+elegirFile :: [String] -> (String, String)
+elegirFile args
+  | any (flip elem larges) args = ("C-large-practice.in", "C-large-practice.out")
+  | otherwise = ("C-small-practice.in", "C-small-practice.out")
 
-generar :: Int -> Int -> Int -> [Tablero]
-generar r c m = map (\t -> T r c t) (filter (\xs -> length (filter (==1) xs) == m ) $ replicateM (r*c) [bomba,tapada])
-
---[0,0,0,0,0]
-
-
-winner :: [Tablero] -> Maybe Tablero
-winner = foldr (\t acc -> case acc of
-                                Nothing -> isWinner t
-                                Just t -> Just t) Nothing
-
-isWinner :: Tablero -> Maybe Tablero
-isWinner t = foldr (\p acc -> case acc of
-                                   Nothing -> isWinnerIn p t
-                                   Just t -> Just t) Nothing (libresPos t)
-isWinnerIn 0 T
-isWinnerIn 4 T
-isWinnerIn 6 T
-
-                                   
-isWinnerIn :: Int -> Tablero -> Maybe Tablero
-isWinnerIn p (T f c ts) = foldr (\t acc -> case acc of
-                                                Nothing -> Just (destapar p t) -- checkear si no hay libres
-                                                Just t -> Just t) Nothing  ts
---p: son todas las posiciones libres                                                
-                                                
-
-destapar :: Int -> Tablero -> Tablero
-destapar p t = t
-
-sing :: Bool -> [Int] -> [Int]
-sing b l = if b then l else []
-
-vecinas_old :: Int -> Tablero -> [Int]
-vecinas_old p (T f c ts) = map (+p) (
-                       sing (p>c-1) [-c]
-                    ++ sing ((p>c-1) && (mod p c) > 0) [-c-1]
-                    ++ sing ((p>c-1) && (mod p c) < c-1) [-c+1]
-                    ++ sing ((mod p c) > 0) [-1]
-                    ++ sing ((mod p c) < c-1) [1]
-                    ++ sing (p<c*f-c && (mod p c) > 0) [c-1]
-                    ++ sing (p<c*f-c) [c]
-                    ++ sing (p<c*f-c  && (mod p c) < c-1) [c+1])
-     
-vecinas :: Int -> Tablero -> [Int]
-vecinas p t = vecinaArribaIzquierda p t ++ vecinaArriba p t ++ vecinaArribaDerecha p t 
-                        ++ vecinaDerecha p t ++ vecinaAbajoDerecha p t ++ vecinaAbajo p t 
-                        ++ vecinaAbajoIzquierda p t ++ vecinaIzquierda p t 
-
-  -- donde el primer p  de un tablero es 0
-vecinaArribaIzquierda p (T f c ts) = if (p > c-1) && (mod p c)>0  then [p-(c+1)] else []
-
-vecinaArriba p (T f c ts) = if (p > c-1) then [p-c] else []
-
-vecinaArribaDerecha p (T f c ts) = if (p > c-1 && (mod (p+1) c)>0  ) then [p-c+1] else []
-
-vecinaDerecha p (T f c ts) = if (mod (p+1) c)>0 then [p+1] else []
-
-vecinaAbajoDerecha p (T f c ts) = if p<(f*c-1)-(c-1) && (mod (p+1) c)>0 then [p+1] else []
-
-vecinaAbajo p (T f c ts) = if p<(f*c-1)-(c-1)  then [p+c] else []
-
-vecinaAbajoIzquierda p (T f c ts) = if p<(f*c-1)-(c-1) && (mod p c) >0 then [p+(c-1)] else []
-
-vecinaIzquierda p (T f c ts) = if (mod p c)>0 then [p-1] else []
-
-
-
-
-areEqual a b = sort a == sort b
-
-tableroTest = T 3 3 [0,0,0,0,0,0,0,0,0]
-vecinasTest = 
-    map (\(p, r) -> if areEqual (vecinas p tableroTest) r then "OK" else "Er: "++show p)
-    [(0, [1,3,4]),
-    (1, [0,2,3,4,5]),
-    (2, [1,4,5]),
-    (3, [0,1,4,6,7]),
-    (4, [0,1,2,3,5,6,7,8]),
-    (5, [1,2,4,7,8]),
-    (6, [3,4,7]),
-    (7, [3,4,5,6,8]),
-    (8, [4,5,7])]
-
-
-tableroTest2 = T 3 1 [0,0,0]
-vecinasTest2 = 
-    map (\(p, r) -> if areEqual (vecinas p tableroTest) r then "OK" else "Er: "++show p)
-    [(0, [1]),
-    (1, [0,2]),
-    (2, [1])]
-
-
+main :: IO ()
+main = do
+  args <- getArgs
+  let (fIn, fOut) = elegirFile args
+  casos <- readFile fIn
+  writeFile fOut (unlines $ resolverCasos $ lines casos)
+  putStrLn $ "Generado out: "++fOut
